@@ -1,0 +1,174 @@
+// TradeFlow ERP/CRM - Prisma schema (PostgreSQL)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  ADMIN
+  SALES
+  WAREHOUSE
+  ACCOUNTS
+}
+
+enum CustomerType {
+  RETAIL
+  WHOLESALE
+  DISTRIBUTOR
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  LEAD
+}
+
+enum FollowUpStatus {
+  PENDING
+  DONE
+}
+
+enum MovementType {
+  IN
+  OUT
+}
+
+enum ChallanStatus {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+}
+
+// ---------------------------------------------------------------------------
+// Models
+// ---------------------------------------------------------------------------
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String // bcrypt hash - never returned by the API
+  name      String
+  role      Role     @default(SALES)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stockMovements StockMovement[]
+
+  @@map("users")
+}
+
+model Customer {
+  id           String         @id @default(cuid())
+  name         String
+  mobile       String
+  businessName String?
+  type         CustomerType   @default(RETAIL)
+  status       CustomerStatus @default(ACTIVE)
+  address      String?
+  city         String?
+  state        String?
+  followUpDate DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  followUps FollowUp[]
+  challans  Challan[]
+
+  @@map("customers")
+}
+
+model FollowUp {
+  id         String         @id @default(cuid())
+  customerId String
+  date       DateTime
+  note       String
+  status     FollowUpStatus @default(PENDING)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@map("follow_ups")
+}
+
+model Product {
+  id           String   @id @default(cuid())
+  sku          String   @unique
+  name         String
+  description  String?
+  unitPrice    Float
+  currentStock Int      @default(0)
+  minStock     Int      @default(0) // low stock when currentStock <= minStock
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  stockMovements StockMovement[]
+  challanItems   ChallanItem[]
+
+  @@map("products")
+}
+
+model StockMovement {
+  id          String       @id @default(cuid())
+  productId   String
+  type        MovementType // IN increases stock, OUT decreases stock
+  quantity    Int
+  reason      String
+  createdById String
+  createdAt   DateTime     @default(now())
+
+  product   Product @relation(fields: [productId], references: [id])
+  createdBy User    @relation(fields: [createdById], references: [id])
+
+  @@index([productId])
+  @@index([type])
+  @@map("stock_movements")
+}
+
+model Challan {
+  id            String        @id @default(cuid())
+  challanNumber String        @unique // CH-YYYYMMDD-####
+  customerId    String
+  status        ChallanStatus @default(DRAFT)
+  totalQuantity Int
+  totalAmount   Float
+  confirmedAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  customer Customer      @relation(fields: [customerId], references: [id])
+  items    ChallanItem[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("challans")
+}
+
+model ChallanItem {
+  id          String @id @default(cuid())
+  challanId   String
+  productId   String
+  productName String // snapshot of product name at challan time
+  productSku  String // snapshot of product sku at challan time
+  unitPrice   Float  // snapshot of unit price at challan time
+  quantity    Int
+  lineTotal   Float  // unitPrice * quantity
+
+  challan Challan @relation(fields: [challanId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([challanId])
+  @@index([productId])
+  @@map("challan_items")
+}
