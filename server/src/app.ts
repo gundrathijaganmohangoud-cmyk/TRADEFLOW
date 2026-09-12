@@ -10,10 +10,17 @@ const app = express();
 // Middleware
 // ---------------------------------------------------------------------------
 
-// CORS - restricts browser clients to the configured frontend origin.
+// CORS - restricts browser clients to the configured frontend origin(s).
+// CORS_ORIGIN may contain a single origin or multiple origins separated by
+// commas (e.g. production + Vercel preview URLs).
+const corsOrigins = (process.env.CORS_ORIGIN ?? "http://localhost:5173")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN ?? "http://localhost:5173",
+    origin: corsOrigins,
     credentials: true,
   })
 );
