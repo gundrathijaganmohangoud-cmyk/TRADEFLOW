@@ -32,6 +32,14 @@ app.use(express.json({ limit: "1mb" }));
 // Routes
 // ---------------------------------------------------------------------------
 
+app.get("/", (_req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "TradeFlow API is running",
+    health: "/api/health",
+  });
+});
+
 app.use("/api", apiRouter);
 
 // 404 for anything that did not match a route (mounted after all routers).
